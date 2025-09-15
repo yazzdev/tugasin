@@ -1,0 +1,32 @@
+{
+  "name": "jajanku",
+  "version": "1.0.0",
+  "description": "Expense Tracker",
+  "keywords": [
+    "Next.js",
+    "Mantine",
+    "UI",
+    "Recharts",
+    "Node.js",
+    "Express.js",
+    "PostgreSQL"
+  ],
+  "homepage": "https://github.com/yazzdev/jajanku#readme",
+  "bugs": {
+    "url": "https://github.com/yazzdev/jajanku/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yazzdev/jajanku.git"
+  },
+  "license": "ISC",
+  "author": "Dyaz Amrullah",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
