@@ -1,0 +1,13 @@
+{
+  "name": "tugasin-monorepo",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter \"./packages/*\" --parallel dev",
+    "build": "pnpm --filter \"./packages/*\" build",
+    "lint": "pnpm --filter \"./packages/*\" lint",
+    "test": "pnpm --filter \"./packages/*\" test"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
