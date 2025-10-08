@@ -44,7 +44,12 @@ cd apps/server && cp .env.example .env && # edit DATABASE_URL
 # Setup database
 pnpm run db:setup
 
+#Create the migration
+cd apps/server
+npx prisma migrate dev --name init
+
 # Start development servers
+cd ../../
 pnpm run dev
 ```
 

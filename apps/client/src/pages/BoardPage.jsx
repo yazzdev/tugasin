@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { DragDropContext, Droppable } from '@hello-pangea/dnd';
 import BoardContext from '../contexts/BoardContext';
@@ -8,7 +8,7 @@ import ShareModal from '../components/modals/ShareModal';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import Button from '../components/ui/Button';
 import api from '../services/api';
-import { Plus, Share2, Trash2 } from 'lucide-react';
+import { Plus, Share2, Trash2, Users } from 'lucide-react';
 
 const BoardPage = () => {
   const { boardId } = useParams();
@@ -17,31 +17,48 @@ const BoardPage = () => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeUsers, setActiveUsers] = useState(0);
 
-  useEffect(() => {
-    loadBoard();
-  }, [boardId]);
-
-  const loadBoard = async () => {
+  const loadBoard = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.getBoard(boardId);
       setBoard(response.board);
-      setColumns(response.columns);
+      const safeColumns = response.columns.map(col => ({
+        ...col,
+        cards: Array.isArray(col.cards) ? col.cards : []
+      }));
+      setColumns(safeColumns);
+      setActiveUsers(response.activeUsers || 0);
     } catch (error) {
       console.error('Error loading board:', error);
-      // Create new board if it doesn't exist
       await createBoard();
     } finally {
       setLoading(false);
     }
-  };
+  }, [boardId]);
+
+  useEffect(() => {
+    loadBoard();
+
+    // Simulate real-time user count (in real app, this would be WebSocket)
+    const interval = setInterval(() => {
+      setActiveUsers(prev => Math.max(1, prev + Math.floor(Math.random() * 3) - 1));
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [loadBoard]);
 
   const createBoard = async () => {
     try {
       const response = await api.createBoard(boardId);
       setBoard(response.board);
-      setColumns(response.columns);
+      const safeColumns = response.columns.map(col => ({
+        ...col,
+        cards: Array.isArray(col.cards) ? col.cards : []
+      }));
+      setColumns(safeColumns);
+      setActiveUsers(1);
     } catch (error) {
       console.error('Error creating board:', error);
     }
@@ -66,20 +83,24 @@ const BoardPage = () => {
 
       setColumns(newColumnOrder);
 
-      // Update positions in backend
-      await Promise.all(
-        newColumnOrder.map((column, index) =>
-          api.updateColumnPosition(column.id, index)
-        )
-      );
+      try {
+        await Promise.all(
+          newColumnOrder.map((column, index) =>
+            api.updateColumnPosition(column.id, index)
+          )
+        );
+      } catch (error) {
+        console.error('Error updating column positions:', error);
+        loadBoard();
+      }
     } else {
-      // Move card between columns
       const sourceColumn = columns.find(col => col.id === source.droppableId);
       const destinationColumn = columns.find(col => col.id === destination.droppableId);
 
+      if (!sourceColumn || !destinationColumn) return;
+
       if (sourceColumn.id === destinationColumn.id) {
-        // Reorder cards in same column
-        const newCards = Array.from(sourceColumn.cards);
+        const newCards = Array.from(sourceColumn.cards || []);
         const [movedCard] = newCards.splice(source.index, 1);
         newCards.splice(destination.index, 0, movedCard);
 
@@ -91,18 +112,23 @@ const BoardPage = () => {
 
         setColumns(updatedColumns);
 
-        // Update card positions
-        await Promise.all(
-          newCards.map((card, index) =>
-            api.updateCardPosition(card.id, index, card.columnId)
-          )
-        );
+        try {
+          await Promise.all(
+            newCards.map((card, index) =>
+              api.updateCardPosition(card.id, index, card.columnId)
+            )
+          );
+        } catch (error) {
+          console.error('Error updating card positions:', error);
+          loadBoard();
+        }
       } else {
-        // Move card to different column
-        const sourceCards = sourceColumn.cards.filter((_, i) => i !== source.index);
-        const [movedCard] = sourceColumn.cards.filter((_, i) => i === source.index);
+        const sourceCards = (sourceColumn.cards || []).filter((_, i) => i !== source.index);
+        const movedCard = (sourceColumn.cards || [])[source.index];
 
-        const newDestinationCards = Array.from(destinationColumn.cards);
+        if (!movedCard) return;
+
+        const newDestinationCards = Array.from(destinationColumn.cards || []);
         newDestinationCards.splice(destination.index, 0, { ...movedCard, columnId: destinationColumn.id });
 
         const updatedColumns = columns.map(col => {
@@ -117,8 +143,12 @@ const BoardPage = () => {
 
         setColumns(updatedColumns);
 
-        // Update card position and column
-        await api.moveCard(movedCard.id, destinationColumn.id, destination.index);
+        try {
+          await api.moveCard(movedCard.id, destinationColumn.id, destination.index);
+        } catch (error) {
+          console.error('Error moving card:', error);
+          loadBoard();
+        }
       }
     }
   };
@@ -132,13 +162,17 @@ const BoardPage = () => {
       cards: []
     };
 
-    setColumns([...columns, newColumn]);
+    setColumns(prev => [...prev, newColumn]);
 
     try {
       const response = await api.addColumn(boardId, newColumn.title, columns.length);
-      setColumns(prev => prev.map(col =>
-        col.id === newColumn.id ? response.column : col
-      ));
+      setColumns(prev =>
+        prev.map(col =>
+          col.id === newColumn.id
+            ? { ...response.column, cards: Array.isArray(response.column.cards) ? response.column.cards : [] }
+            : col
+        )
+      );
     } catch (error) {
       console.error('Error adding column:', error);
       setColumns(prev => prev.filter(col => col.id !== newColumn.id));
@@ -151,6 +185,15 @@ const BoardPage = () => {
       window.location.href = '/';
     } catch (error) {
       console.error('Error deleting board:', error);
+    }
+  };
+
+  const deleteColumn = async (columnId) => {
+    try {
+      await api.deleteColumn(columnId);
+      setColumns(prev => prev.filter(col => col.id !== columnId));
+    } catch (error) {
+      console.error('Error deleting column:', error);
     }
   };
 
@@ -172,9 +215,17 @@ const BoardPage = () => {
 
         <div className="container mx-auto px-4 py-6">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold text-slate-800">
-              {board?.name || 'Untitled Board'}
-            </h1>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-800">
+                {board?.name || 'Untitled Board'}
+              </h1>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-1 text-sm text-slate-500">
+                  <Users className="w-4 h-4" />
+                  <span>{activeUsers} {activeUsers === 1 ? 'user' : 'users'} online</span>
+                </div>
+              </div>
+            </div>
             <div className="flex gap-2">
               <Button
                 onClick={() => setShowShareModal(true)}
@@ -201,13 +252,15 @@ const BoardPage = () => {
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="flex gap-4 overflow-x-auto pb-4"
+                  className="flex gap-4 overflow-x-auto pb-4 min-h-[calc(100vh-200px)]"
                 >
                   {columns.map((column, index) => (
                     <Column
                       key={column.id}
                       column={column}
                       index={index}
+                      boardId={boardId}
+                      onDelete={deleteColumn}
                     />
                   ))}
                   {provided.placeholder}

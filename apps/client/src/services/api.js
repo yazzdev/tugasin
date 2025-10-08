@@ -9,11 +9,11 @@ const api = axios.create({
   },
 });
 
-// Response interceptor to update last active time
+// Add response interceptor for better error handling
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error('API Error:', error);
+    console.error('API Error:', error.response?.data || error.message);
     return Promise.reject(error);
   }
 );
@@ -46,7 +46,8 @@ export default {
   },
 
   async updateColumnPosition(columnId, position) {
-    await api.patch(`/columns/${columnId}/position`, { position });
+    const response = await api.patch(`/columns/${columnId}/position`, { position });
+    return response.data;
   },
 
   async deleteColumn(columnId) {
@@ -54,8 +55,15 @@ export default {
   },
 
   // Card operations
-  async addCard(columnId, title, description, position) {
-    const response = await api.post('/cards', { columnId, title, description, position });
+  async addCard(columnId, title, description, position, dueDate = null, completed = false) {
+    const response = await api.post('/cards', {
+      columnId,
+      title,
+      description,
+      position,
+      dueDate,
+      completed
+    });
     return response.data;
   },
 
@@ -65,14 +73,16 @@ export default {
   },
 
   async updateCardPosition(cardId, position, columnId) {
-    await api.patch(`/cards/${cardId}/position`, { position, columnId });
+    const response = await api.patch(`/cards/${cardId}/position`, { position, columnId });
+    return response.data;
   },
 
   async moveCard(cardId, newColumnId, newPosition) {
-    await api.patch(`/cards/${cardId}/move`, {
+    const response = await api.patch(`/cards/${cardId}/move`, {
       newColumnId,
       newPosition
     });
+    return response.data;
   },
 
   async deleteCard(cardId) {

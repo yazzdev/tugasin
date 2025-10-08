@@ -6,17 +6,17 @@ import Input from '../ui/Input';
 import { Plus, MoreHorizontal, Edit3, Trash2 } from 'lucide-react';
 import api from '../../services/api';
 
-const Column = ({ column, index }) => {
+const Column = ({ column, index, boardId, onDelete }) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [newTitle, setNewTitle] = useState(column.title);
   const [showMenu, setShowMenu] = useState(false);
+  const [cards, setCards] = useState(column.cards || []);
 
   const handleTitleChange = async (e) => {
     e.preventDefault();
     if (newTitle.trim() && newTitle !== column.title) {
       try {
         await api.updateColumn(column.id, { title: newTitle.trim() });
-        column.title = newTitle.trim();
       } catch (error) {
         console.error('Error updating column:', error);
       }
@@ -27,8 +27,7 @@ const Column = ({ column, index }) => {
   const deleteColumn = async () => {
     try {
       await api.deleteColumn(column.id);
-      // Remove column from UI (parent component will handle this)
-      window.location.reload();
+      onDelete(column.id);
     } catch (error) {
       console.error('Error deleting column:', error);
     }
@@ -37,23 +36,53 @@ const Column = ({ column, index }) => {
   const addCard = async () => {
     const newCard = {
       id: `card-${Date.now()}`,
-      title: 'New Card',
+      title: 'New Task',
       description: '',
       columnId: column.id,
-      position: column.cards.length
+      position: cards.length,
+      dueDate: null,
+      completed: false
     };
 
-    // Update UI optimistically
-    const updatedCards = [...column.cards, newCard];
-    // Parent component will handle the actual update
+    // Optimistically add to UI
+    const updatedCards = [...cards, newCard];
+    setCards(updatedCards);
 
     try {
-      const response = await api.addCard(column.id, newCard.title, newCard.description, column.cards.length);
-      // Update with actual ID from server
+      const response = await api.addCard(
+        column.id,
+        newCard.title,
+        newCard.description,
+        cards.length,
+        newCard.dueDate,
+        newCard.completed
+      );
+      // Replace with actual card from API
+      const finalCards = updatedCards.map(card =>
+        card.id === newCard.id ? response.card : card
+      );
+      setCards(finalCards);
     } catch (error) {
       console.error('Error adding card:', error);
+      // Revert optimistic update
+      setCards(cards);
     }
   };
+
+  // Handle card updates from child components
+  const updateCardInColumn = (updatedCard) => {
+    setCards(prev => prev.map(card =>
+      card.id === updatedCard.id ? updatedCard : card
+    ));
+  };
+
+  const deleteCardFromColumn = (cardId) => {
+    setCards(prev => prev.filter(card => card.id !== cardId));
+  };
+
+  // Calculate completed cards
+  const completedCount = cards.filter(card => card.completed).length;
+  const totalCount = cards.length;
 
   return (
     <Draggable draggableId={column.id} index={index}>
@@ -61,7 +90,7 @@ const Column = ({ column, index }) => {
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          className="bg-white rounded-lg shadow-sm border border-gray-200 w-72 flex-shrink-0"
+          className="bg-white rounded-lg shadow-sm border border-gray-200 w-72 flex-shrink-0 flex flex-col"
         >
           {/* Column Header */}
           <div className="p-4 border-b border-gray-200">
@@ -117,7 +146,16 @@ const Column = ({ column, index }) => {
               </div>
             </div>
 
-            <p className="text-sm text-slate-500">{column.cards.length} cards</p>
+            <div className="flex justify-between items-center">
+              <p className="text-sm text-slate-500">
+                {totalCount} {totalCount === 1 ? 'card' : 'cards'}
+              </p>
+              {completedCount > 0 && (
+                <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                  {completedCount} completed
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Cards */}
@@ -126,13 +164,16 @@ const Column = ({ column, index }) => {
               <div
                 ref={provided.innerRef}
                 {...provided.droppableProps}
-                className={`p-2 min-h-32 ${snapshot.isDraggingOver ? 'bg-skylight-hover' : ''}`}
+                className={`p-2 min-h-32 flex-1 overflow-y-auto ${snapshot.isDraggingOver ? 'bg-skylight-hover' : ''
+                  }`}
               >
-                {column.cards.map((card, cardIndex) => (
+                {cards.map((card, cardIndex) => (
                   <Card
                     key={card.id}
                     card={card}
                     index={cardIndex}
+                    onUpdate={updateCardInColumn}
+                    onDelete={deleteCardFromColumn}
                   />
                 ))}
                 {provided.placeholder}
