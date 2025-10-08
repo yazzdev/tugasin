@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MoreHorizontal, Edit3, Trash2, Calendar, CheckCircle, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import api from '../../services/api';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
+import Toast from '../ui/Toast';
 
 const Card = ({
   card,
@@ -17,6 +18,7 @@ const Card = ({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [isOverdue, setIsOverdue] = useState(false);
+  const [toast, setToast] = useState(null);
 
   const [formData, setFormData] = useState({
     title: card.title,
@@ -32,6 +34,10 @@ const Card = ({
       setIsOverdue(due < now && !card.completed);
     }
   }, [card.dueDate, card.completed]);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+  };
 
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -53,8 +59,10 @@ const Card = ({
       const updatedCard = await api.updateCard(card.id, payload);
       onUpdate(updatedCard);
       setShowEditModal(false);
+      showToast('Task updated successfully', 'success');
     } catch (error) {
       console.error('Error updating card:', error);
+      showToast('Failed to update task', 'error');
     }
   };
 
@@ -62,8 +70,10 @@ const Card = ({
     try {
       const updatedCard = await api.updateCard(card.id, { completed: !card.completed });
       onUpdate(updatedCard);
+      showToast(`Task marked as ${updatedCard.completed ? 'completed' : 'pending'}`, 'success');
     } catch (error) {
       console.error('Error updating card status:', error);
+      showToast('Failed to update task status', 'error');
     }
   };
 
@@ -71,9 +81,20 @@ const Card = ({
     try {
       await api.deleteCard(card.id);
       onDelete(card.id);
+      setShowDeleteModal(false);
+      showToast('Task deleted successfully', 'success');
     } catch (error) {
       console.error('Error deleting card:', error);
+      showToast('Failed to delete task', 'error');
     }
+  };
+
+  const moveLeft = () => {
+    onMoveLeft(card.id, columnId);
+  };
+
+  const moveRight = () => {
+    onMoveRight(card.id, columnId);
   };
 
   // Find current column index for move buttons
@@ -91,7 +112,7 @@ const Card = ({
       {/* Move Buttons */}
       {canMoveLeft && (
         <button
-          onClick={() => onMoveLeft(card.id, columnId)}
+          onClick={moveLeft}
           className="absolute -left-2 top-1/2 transform -translate-y-1/2 bg-orange-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-orange-600"
           title="Move Left"
         >
@@ -101,7 +122,7 @@ const Card = ({
 
       {canMoveRight && (
         <button
-          onClick={() => onMoveRight(card.id, columnId)}
+          onClick={moveRight}
           className="absolute -right-2 top-1/2 transform -translate-y-1/2 bg-green-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-green-600"
           title="Move Right"
         >
@@ -372,6 +393,15 @@ const Card = ({
         title="Delete Task"
         message="Are you sure you want to delete this task? This action cannot be undone."
       />
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 };

@@ -5,6 +5,7 @@ import Input from '../ui/Input';
 import { Plus, MoreHorizontal, Edit3, Trash2, X } from 'lucide-react';
 import api from '../../services/api';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
+import Toast from '../ui/Toast';
 
 const Column = ({
   column,
@@ -19,6 +20,7 @@ const Column = ({
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [cards, setCards] = useState(column.cards || []);
+  const [toast, setToast] = useState(null);
 
   const [columnTitle, setColumnTitle] = useState(column.title);
   const [newCardData, setNewCardData] = useState({
@@ -26,6 +28,10 @@ const Column = ({
     description: '',
     dueDate: new Date().toISOString().split('T')[0]
   });
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+  };
 
   const handleAddCard = async () => {
     try {
@@ -61,9 +67,11 @@ const Column = ({
         description: '',
         dueDate: new Date().toISOString().split('T')[0]
       });
+      showToast('Task added successfully', 'success');
     } catch (error) {
       console.error('Error adding card:', error);
       setCards(column.cards || []);
+      showToast('Failed to add task', 'error');
     }
   };
 
@@ -72,8 +80,10 @@ const Column = ({
       await api.updateColumn(column.id, { title: columnTitle });
       onColumnUpdate(column.id, { title: columnTitle });
       setShowEditModal(false);
+      showToast('Column updated successfully', 'success');
     } catch (error) {
       console.error('Error updating column:', error);
+      showToast('Failed to update column', 'error');
     }
   };
 
@@ -81,8 +91,11 @@ const Column = ({
     try {
       await api.deleteColumn(column.id);
       onDelete(column.id);
+      setShowDeleteModal(false);
+      showToast('Column deleted successfully', 'success');
     } catch (error) {
       console.error('Error deleting column:', error);
+      showToast('Failed to delete column', 'error');
     }
   };
 
@@ -116,7 +129,7 @@ const Column = ({
   const totalCount = cards.length;
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 w-72 flex-shrink-0 flex flex-col min-h-[400px] max-h-[400px]">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 w-72 flex-shrink-0 flex flex-col min-h-[400px] relative">
       {/* Column Header */}
       <div className="p-4 border-b border-gray-200 flex-shrink-0">
         <div className="flex items-center justify-between mb-2">
@@ -324,6 +337,15 @@ const Column = ({
         title="Delete Column"
         message="Are you sure you want to delete this column? All cards in this column will be permanently deleted."
       />
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 };

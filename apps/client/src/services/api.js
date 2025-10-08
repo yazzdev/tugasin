@@ -81,6 +81,6 @@ export default {
       newColumnId,
       newPosition
     });
-    return response.data.card;
+    return response.data;
   },
 };

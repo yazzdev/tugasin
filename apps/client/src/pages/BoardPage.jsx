@@ -8,6 +8,7 @@ import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import Button from '../components/ui/Button';
 import api from '../services/api';
 import { Plus, Share2, Trash2, Users, X } from 'lucide-react';
+import Toast from '../components/ui/Toast';
 
 const BoardPage = () => {
   const { boardId } = useParams();
@@ -19,6 +20,11 @@ const BoardPage = () => {
   const [loading, setLoading] = useState(true);
   const [activeUsers, setActiveUsers] = useState(0);
   const [newColumnName, setNewColumnName] = useState('New Column');
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+  };
 
   const loadBoard = useCallback(async () => {
     try {
@@ -59,8 +65,10 @@ const BoardPage = () => {
       }));
       setColumns(safeColumns);
       setActiveUsers(1);
+      showToast('Board created successfully', 'success');
     } catch (error) {
       console.error('Error creating board:', error);
+      showToast('Failed to create board', 'error');
     }
   };
 
@@ -87,9 +95,11 @@ const BoardPage = () => {
       );
       setShowAddColumnModal(false);
       setNewColumnName('New Column');
+      showToast('Column added successfully', 'success');
     } catch (error) {
       console.error('Error adding column:', error);
       setColumns(columns);
+      showToast('Failed to add column', 'error');
     }
   };
 
@@ -97,8 +107,10 @@ const BoardPage = () => {
     try {
       await api.deleteBoard(boardId);
       window.location.href = '/';
+      showToast('Board deleted successfully', 'success');
     } catch (error) {
       console.error('Error deleting board:', error);
+      showToast('Failed to delete board', 'error');
     }
   };
 
@@ -106,8 +118,10 @@ const BoardPage = () => {
     try {
       await api.deleteColumn(columnId);
       setColumns(prev => prev.filter(col => col.id !== columnId));
+      showToast('Column deleted successfully', 'success');
     } catch (error) {
       console.error('Error deleting column:', error);
+      showToast('Failed to delete column', 'error');
     }
   };
 
@@ -119,8 +133,8 @@ const BoardPage = () => {
 
   const moveCard = async (cardId, sourceColumnId, targetColumnId) => {
     try {
-      // Update position to append to target column (newPosition will be calculated on server)
-      const updatedCard = await api.moveCard(cardId, targetColumnId, null);
+      // Update position to 0 (append to target column)
+      const updatedCard = await api.moveCard(cardId, targetColumnId, 0);
 
       // Update local state
       setColumns(prev => prev.map(col => {
@@ -133,13 +147,16 @@ const BoardPage = () => {
         if (col.id === targetColumnId) {
           return {
             ...col,
-            cards: [...col.cards, updatedCard]
+            cards: [updatedCard, ...col.cards]
           };
         }
         return col;
       }));
+
+      showToast('Task moved successfully', 'success');
     } catch (error) {
       console.error('Error moving card:', error);
+      showToast('Failed to move task', 'error');
     }
   };
 
@@ -279,6 +296,15 @@ const BoardPage = () => {
           title="Delete Board"
           message="Are you sure you want to delete this board? This action cannot be undone."
         />
+
+        {/* Toast Notification */}
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )}
       </div>
     </BoardContext.Provider>
   );
