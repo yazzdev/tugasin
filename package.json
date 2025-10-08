@@ -1,32 +1,18 @@
 {
-  "name": "jajanku",
+  "name": "tugasin",
   "version": "1.0.0",
-  "description": "Expense Tracker",
-  "keywords": [
-    "Next.js",
-    "Mantine",
-    "UI",
-    "Recharts",
-    "Node.js",
-    "Express.js",
-    "PostgreSQL"
-  ],
-  "homepage": "https://github.com/yazzdev/jajanku#readme",
-  "bugs": {
-    "url": "https://github.com/yazzdev/jajanku/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/yazzdev/jajanku.git"
-  },
-  "license": "ISC",
-  "author": "Dyaz Amrullah",
-  "type": "commonjs",
-  "main": "index.js",
+  "description": "Guest-only Kanban board application",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "concurrently \"pnpm --filter client dev\" \"pnpm --filter server dev\"",
+    "db:setup": "cd apps/server && npx prisma generate && npx prisma migrate deploy",
+    "cleanup": "node apps/server/src/cron/boardCleanup.js",
+    "build": "pnpm --filter client build && pnpm --filter server build"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
-  }
+    "concurrently": "^8.2.0"
+  },
+  "workspaces": [
+    "apps/*"
+  ]
 }

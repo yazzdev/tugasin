@@ -1,0 +1,26 @@
+{
+  "name": "server",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Tugasin backend server",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "build": "echo 'No build needed for server'",
+    "db:setup": "npx prisma generate && npx prisma migrate deploy",
+    "cleanup": "node src/cron/boardCleanup.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "pg": "^8.11.3",
+    "@prisma/client": "^5.4.2",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "prisma": "^5.4.2"
+  }
+}
