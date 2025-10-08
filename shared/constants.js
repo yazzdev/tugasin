@@ -1,11 +1,11 @@
-export const SKYLIGHT_THEME = {
-  primary: '#4F9CF7',
-  secondary: '#F0F9FF',
-  background: '#FFFFFF',
-  cardBackground: '#FAFBFD',
-  hover: '#F1F5F9',
-  textPrimary: '#1E293B',
-  textSecondary: '#64748B'
+module.exports = {
+  BOARD_EXPIRY_DAYS: 7,
+  SKYLIGHT_THEME: {
+    primary: '#4F9CF7',
+    secondary: '#F0F9FF',
+    background: '#FFFFFF',
+    cardBackground: '#FAFBFD',
+    hover: '#F1F5F9'
+  },
+  DEFAULT_BOARD_NAME: 'Untitled Board'
 };
-
-export const BOARD_EXPIRY_DAYS = 7;
