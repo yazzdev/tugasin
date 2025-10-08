@@ -1,0 +1,17 @@
+{
+  "name": "tugasin",
+  "version": "1.0.0",
+  "description": "Guest-only Kanban board application",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"pnpm:server\" \"pnpm:client\"",
+    "server": "cd apps/server && pnpm run dev",
+    "client": "cd apps/client && pnpm run dev",
+    "db:setup": "cd apps/server && pnpm run db:setup",
+    "cleanup": "cd apps/server && node src/cron/boardCleanup.js",
+    "build": "cd apps/client && pnpm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}
