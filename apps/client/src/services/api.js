@@ -29,6 +29,11 @@ export default {
     return response.data;
   },
 
+  async updateBoard(boardId, data) {
+    const response = await api.put(`/boards/${boardId}`, data);
+    return response.data;
+  },
+
   async deleteBoard(boardId) {
     await api.delete(`/boards/${boardId}`);
   },
@@ -76,6 +81,6 @@ export default {
       newColumnId,
       newPosition
     });
-    return response.data;
+    return response.data.card;
   },
 };

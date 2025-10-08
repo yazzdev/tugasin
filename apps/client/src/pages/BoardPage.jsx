@@ -7,8 +7,7 @@ import ShareModal from '../components/modals/ShareModal';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import Button from '../components/ui/Button';
 import api from '../services/api';
-import { Plus, Share2, Trash2, Users } from 'lucide-react';
-import { getDragState, clearDragState } from '../utils/dragUtils';
+import { Plus, Share2, Trash2, Users, X } from 'lucide-react';
 
 const BoardPage = () => {
   const { boardId } = useParams();
@@ -16,8 +15,10 @@ const BoardPage = () => {
   const [columns, setColumns] = useState([]);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showAddColumnModal, setShowAddColumnModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeUsers, setActiveUsers] = useState(0);
+  const [newColumnName, setNewColumnName] = useState('New Column');
 
   const loadBoard = useCallback(async () => {
     try {
@@ -63,18 +64,19 @@ const BoardPage = () => {
     }
   };
 
-  const addColumn = async () => {
-    const newColumn = {
-      id: `col-${Date.now()}`,
-      title: 'New Column',
-      boardId,
-      position: columns.length,
-      cards: []
-    };
-
-    setColumns(prev => [...prev, newColumn]);
-
+  const handleAddColumn = async () => {
     try {
+      const newColumn = {
+        id: `col-${Date.now()}`,
+        title: newColumnName,
+        boardId,
+        position: columns.length,
+        cards: []
+      };
+
+      const updatedColumns = [...columns, newColumn];
+      setColumns(updatedColumns);
+
       const response = await api.addColumn(boardId, newColumn.title, columns.length);
       setColumns(prev =>
         prev.map(col =>
@@ -83,9 +85,11 @@ const BoardPage = () => {
             : col
         )
       );
+      setShowAddColumnModal(false);
+      setNewColumnName('New Column');
     } catch (error) {
       console.error('Error adding column:', error);
-      setColumns(prev => prev.filter(col => col.id !== newColumn.id));
+      setColumns(columns);
     }
   };
 
@@ -107,54 +111,36 @@ const BoardPage = () => {
     }
   };
 
-  const handleCardDrop = (targetColumnId) => {
-    const dragState = getDragState();
-    if (dragState.isDragging && dragState.type === 'CARD') {
-      // Find source column
-      const sourceColumn = columns.find(col => col.id === dragState.source.columnId);
-      if (!sourceColumn) {
-        clearDragState();
-        return;
-      }
-
-      // Find dragged card
-      const draggedCard = sourceColumn.cards.find(card => card.id === dragState.draggedItem.id);
-      if (!draggedCard) {
-        clearDragState();
-        return;
-      }
-
-      // Update UI
-      const newColumns = columns.map(col => {
-        if (col.id === sourceColumn.id) {
-          // Remove from source
-          return {
-            ...col,
-            cards: col.cards.filter(card => card.id !== draggedCard.id)
-          };
-        }
-        if (col.id === targetColumnId) {
-          // Add to target
-          return {
-            ...col,
-            cards: [...col.cards, { ...draggedCard, columnId: targetColumnId }]
-          };
-        }
-        return col;
-      });
-
-      setColumns(newColumns);
-      clearDragState();
-
-      // Update API
-      api.moveCard(draggedCard.id, targetColumnId, newColumns.find(c => c.id === targetColumnId).cards.length - 1);
-    }
-  };
-
   const updateColumn = (columnId, updates) => {
     setColumns(prev => prev.map(col =>
       col.id === columnId ? { ...col, ...updates } : col
     ));
+  };
+
+  const moveCard = async (cardId, sourceColumnId, targetColumnId) => {
+    try {
+      // Update position to append to target column (newPosition will be calculated on server)
+      const updatedCard = await api.moveCard(cardId, targetColumnId, null);
+
+      // Update local state
+      setColumns(prev => prev.map(col => {
+        if (col.id === sourceColumnId) {
+          return {
+            ...col,
+            cards: col.cards.filter(card => card.id !== cardId)
+          };
+        }
+        if (col.id === targetColumnId) {
+          return {
+            ...col,
+            cards: [...col.cards, updatedCard]
+          };
+        }
+        return col;
+      }));
+    } catch (error) {
+      console.error('Error moving card:', error);
+    }
   };
 
   if (loading) {
@@ -213,14 +199,15 @@ const BoardPage = () => {
                 column={column}
                 boardId={boardId}
                 onDelete={deleteColumn}
-                onCardDrop={handleCardDrop}
                 onColumnUpdate={updateColumn}
+                allColumns={columns}
+                onMoveCard={moveCard}
               />
             ))}
 
             <div className="flex-shrink-0">
               <Button
-                onClick={addColumn}
+                onClick={() => setShowAddColumnModal(true)}
                 variant="outline"
                 className="h-12 flex items-center gap-2 border-2 border-dashed border-gray-300 hover:border-skylight-primary hover:bg-skylight-primary/5"
               >
@@ -230,6 +217,54 @@ const BoardPage = () => {
             </div>
           </div>
         </div>
+
+        {/* Add Column Modal */}
+        {showAddColumnModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-slate-800">Add New Column</h3>
+                <button
+                  onClick={() => setShowAddColumnModal(false)}
+                  className="p-1 hover:bg-gray-100 rounded text-gray-500"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Column Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newColumnName}
+                    onChange={(e) => setNewColumnName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-skylight-primary"
+                    placeholder="Enter column name"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-6">
+                <button
+                  onClick={() => setShowAddColumnModal(false)}
+                  className="px-4 py-2 border border-gray-300 text-slate-700 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddColumn}
+                  className="px-4 py-2 bg-skylight-primary text-white rounded-lg hover:bg-blue-600"
+                >
+                  Add Column
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <ShareModal
           isOpen={showShareModal}
