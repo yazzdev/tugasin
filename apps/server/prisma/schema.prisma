@@ -14,6 +14,10 @@ model Board {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   columns       Column[]
+  activeUsers   Int       @default(0)
+  expiresAt     DateTime  @default(dbgenerated("now() + interval '7 days'"))
+  
+  @@map("boards")
 }
 
 model Column {
@@ -21,10 +25,13 @@ model Column {
   title     String
   boardId   String
   board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  position  Int
+  position  Int      @default(0)
   cards     Card[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  @@unique([boardId, position])
+  @@map("columns")
 }
 
 model Card {
@@ -33,7 +40,16 @@ model Card {
   description String?
   columnId    String
   column      Column   @relation(fields: [columnId], references: [id], onDelete: Cascade)
-  position    Int
+  position    Int      @default(0)
+  dueDate     DateTime?
+  completed   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
+  @@unique([columnId, position])
+  @@map("cards")
 }
+
+// Optional: Add index for better query performance
+// @@index([boardId, position], name: "column_position_idx")
+// @@index([columnId, position], name: "card_position_idx")

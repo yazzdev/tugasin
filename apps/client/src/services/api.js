@@ -9,7 +9,6 @@ const api = axios.create({
   },
 });
 
-// Add response interceptor for better error handling
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -45,11 +44,6 @@ export default {
     return response.data;
   },
 
-  async updateColumnPosition(columnId, position) {
-    const response = await api.patch(`/columns/${columnId}/position`, { position });
-    return response.data;
-  },
-
   async deleteColumn(columnId) {
     await api.delete(`/columns/${columnId}`);
   },
@@ -72,20 +66,16 @@ export default {
     return response.data;
   },
 
-  async updateCardPosition(cardId, position, columnId) {
-    const response = await api.patch(`/cards/${cardId}/position`, { position, columnId });
-    return response.data;
+  async deleteCard(cardId) {
+    await api.delete(`/cards/${cardId}`);
   },
 
+  // Move card between columns
   async moveCard(cardId, newColumnId, newPosition) {
     const response = await api.patch(`/cards/${cardId}/move`, {
       newColumnId,
       newPosition
     });
     return response.data;
-  },
-
-  async deleteCard(cardId) {
-    await api.delete(`/cards/${cardId}`);
   },
 };

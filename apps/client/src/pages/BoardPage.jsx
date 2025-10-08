@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { DragDropContext, Droppable } from '@hello-pangea/dnd';
 import BoardContext from '../contexts/BoardContext';
 import Header from '../components/layout/Header';
 import Column from '../components/board/Column';
@@ -9,6 +8,7 @@ import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import Button from '../components/ui/Button';
 import api from '../services/api';
 import { Plus, Share2, Trash2, Users } from 'lucide-react';
+import { getDragState, clearDragState } from '../utils/dragUtils';
 
 const BoardPage = () => {
   const { boardId } = useParams();
@@ -41,7 +41,6 @@ const BoardPage = () => {
   useEffect(() => {
     loadBoard();
 
-    // Simulate real-time user count (in real app, this would be WebSocket)
     const interval = setInterval(() => {
       setActiveUsers(prev => Math.max(1, prev + Math.floor(Math.random() * 3) - 1));
     }, 5000);
@@ -61,95 +60,6 @@ const BoardPage = () => {
       setActiveUsers(1);
     } catch (error) {
       console.error('Error creating board:', error);
-    }
-  };
-
-  const onDragEnd = async (result) => {
-    const { destination, source, draggableId, type } = result;
-
-    if (!destination) return;
-
-    if (
-      destination.droppableId === source.droppableId &&
-      destination.index === source.index
-    ) {
-      return;
-    }
-
-    if (type === 'COLUMN') {
-      const newColumnOrder = Array.from(columns);
-      const [movedColumn] = newColumnOrder.splice(source.index, 1);
-      newColumnOrder.splice(destination.index, 0, movedColumn);
-
-      setColumns(newColumnOrder);
-
-      try {
-        await Promise.all(
-          newColumnOrder.map((column, index) =>
-            api.updateColumnPosition(column.id, index)
-          )
-        );
-      } catch (error) {
-        console.error('Error updating column positions:', error);
-        loadBoard();
-      }
-    } else {
-      const sourceColumn = columns.find(col => col.id === source.droppableId);
-      const destinationColumn = columns.find(col => col.id === destination.droppableId);
-
-      if (!sourceColumn || !destinationColumn) return;
-
-      if (sourceColumn.id === destinationColumn.id) {
-        const newCards = Array.from(sourceColumn.cards || []);
-        const [movedCard] = newCards.splice(source.index, 1);
-        newCards.splice(destination.index, 0, movedCard);
-
-        const updatedColumns = columns.map(col =>
-          col.id === sourceColumn.id
-            ? { ...col, cards: newCards }
-            : col
-        );
-
-        setColumns(updatedColumns);
-
-        try {
-          await Promise.all(
-            newCards.map((card, index) =>
-              api.updateCardPosition(card.id, index, card.columnId)
-            )
-          );
-        } catch (error) {
-          console.error('Error updating card positions:', error);
-          loadBoard();
-        }
-      } else {
-        const sourceCards = (sourceColumn.cards || []).filter((_, i) => i !== source.index);
-        const movedCard = (sourceColumn.cards || [])[source.index];
-
-        if (!movedCard) return;
-
-        const newDestinationCards = Array.from(destinationColumn.cards || []);
-        newDestinationCards.splice(destination.index, 0, { ...movedCard, columnId: destinationColumn.id });
-
-        const updatedColumns = columns.map(col => {
-          if (col.id === sourceColumn.id) {
-            return { ...col, cards: sourceCards };
-          }
-          if (col.id === destinationColumn.id) {
-            return { ...col, cards: newDestinationCards };
-          }
-          return col;
-        });
-
-        setColumns(updatedColumns);
-
-        try {
-          await api.moveCard(movedCard.id, destinationColumn.id, destination.index);
-        } catch (error) {
-          console.error('Error moving card:', error);
-          loadBoard();
-        }
-      }
     }
   };
 
@@ -195,6 +105,56 @@ const BoardPage = () => {
     } catch (error) {
       console.error('Error deleting column:', error);
     }
+  };
+
+  const handleCardDrop = (targetColumnId) => {
+    const dragState = getDragState();
+    if (dragState.isDragging && dragState.type === 'CARD') {
+      // Find source column
+      const sourceColumn = columns.find(col => col.id === dragState.source.columnId);
+      if (!sourceColumn) {
+        clearDragState();
+        return;
+      }
+
+      // Find dragged card
+      const draggedCard = sourceColumn.cards.find(card => card.id === dragState.draggedItem.id);
+      if (!draggedCard) {
+        clearDragState();
+        return;
+      }
+
+      // Update UI
+      const newColumns = columns.map(col => {
+        if (col.id === sourceColumn.id) {
+          // Remove from source
+          return {
+            ...col,
+            cards: col.cards.filter(card => card.id !== draggedCard.id)
+          };
+        }
+        if (col.id === targetColumnId) {
+          // Add to target
+          return {
+            ...col,
+            cards: [...col.cards, { ...draggedCard, columnId: targetColumnId }]
+          };
+        }
+        return col;
+      });
+
+      setColumns(newColumns);
+      clearDragState();
+
+      // Update API
+      api.moveCard(draggedCard.id, targetColumnId, newColumns.find(c => c.id === targetColumnId).cards.length - 1);
+    }
+  };
+
+  const updateColumn = (columnId, updates) => {
+    setColumns(prev => prev.map(col =>
+      col.id === columnId ? { ...col, ...updates } : col
+    ));
   };
 
   if (loading) {
@@ -246,39 +206,29 @@ const BoardPage = () => {
             </div>
           </div>
 
-          <DragDropContext onDragEnd={onDragEnd}>
-            <Droppable droppableId="board" type="COLUMN" direction="horizontal">
-              {(provided) => (
-                <div
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  className="flex gap-4 overflow-x-auto pb-4 min-h-[calc(100vh-200px)]"
-                >
-                  {columns.map((column, index) => (
-                    <Column
-                      key={column.id}
-                      column={column}
-                      index={index}
-                      boardId={boardId}
-                      onDelete={deleteColumn}
-                    />
-                  ))}
-                  {provided.placeholder}
+          <div className="flex gap-4 overflow-x-auto pb-4 min-h-[calc(100vh-200px)]">
+            {columns.map((column) => (
+              <Column
+                key={column.id}
+                column={column}
+                boardId={boardId}
+                onDelete={deleteColumn}
+                onCardDrop={handleCardDrop}
+                onColumnUpdate={updateColumn}
+              />
+            ))}
 
-                  <div className="flex-shrink-0">
-                    <Button
-                      onClick={addColumn}
-                      variant="outline"
-                      className="h-12 flex items-center gap-2 border-2 border-dashed border-gray-300 hover:border-skylight-primary hover:bg-skylight-primary/5"
-                    >
-                      <Plus className="w-5 h-5" />
-                      Add Column
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </Droppable>
-          </DragDropContext>
+            <div className="flex-shrink-0">
+              <Button
+                onClick={addColumn}
+                variant="outline"
+                className="h-12 flex items-center gap-2 border-2 border-dashed border-gray-300 hover:border-skylight-primary hover:bg-skylight-primary/5"
+              >
+                <Plus className="w-5 h-5" />
+                Add Column
+              </Button>
+            </div>
+          </div>
         </div>
 
         <ShareModal

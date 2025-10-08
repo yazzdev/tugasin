@@ -7,17 +7,25 @@ router.post('/', async (req, res) => {
   try {
     const { boardId, title, position } = req.body;
 
+    // Validate required fields
+    if (!boardId || !title) {
+      return res.status(400).json({ error: 'boardId and title are required' });
+    }
+
     const column = await prisma.column.create({
       data: {
         title,
         boardId,
-        position: position || 0
+        position: position !== undefined ? position : 0
       }
     });
 
     res.status(201).json({ column });
   } catch (error) {
     console.error('Error creating column:', error);
+    if (error.code === 'P2003') {
+      return res.status(400).json({ error: 'Invalid boardId' });
+    }
     res.status(500).json({ error: 'Failed to create column' });
   }
 });
@@ -28,6 +36,10 @@ router.put('/:columnId', async (req, res) => {
     const { columnId } = req.params;
     const { title } = req.body;
 
+    if (!title) {
+      return res.status(400).json({ error: 'title is required' });
+    }
+
     const column = await prisma.column.update({
       where: { id: columnId },
       data: { title }
@@ -36,6 +48,9 @@ router.put('/:columnId', async (req, res) => {
     res.json({ column });
   } catch (error) {
     console.error('Error updating column:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Column not found' });
+    }
     res.status(500).json({ error: 'Failed to update column' });
   }
 });
@@ -46,14 +61,21 @@ router.patch('/:columnId/position', async (req, res) => {
     const { columnId } = req.params;
     const { position } = req.body;
 
-    await prisma.column.update({
+    if (position === undefined) {
+      return res.status(400).json({ error: 'position is required' });
+    }
+
+    const column = await prisma.column.update({
       where: { id: columnId },
       data: { position }
     });
 
-    res.json({ message: 'Position updated' });
+    res.json({ column });
   } catch (error) {
     console.error('Error updating column position:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Column not found' });
+    }
     res.status(500).json({ error: 'Failed to update position' });
   }
 });
@@ -70,6 +92,9 @@ router.delete('/:columnId', async (req, res) => {
     res.json({ message: 'Column deleted successfully' });
   } catch (error) {
     console.error('Error deleting column:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Column not found' });
+    }
     res.status(500).json({ error: 'Failed to delete column' });
   }
 });
